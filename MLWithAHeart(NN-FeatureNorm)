@@ -1,0 +1,158 @@
+import numpy as np
+import matplotlib.pyplot as plt
+import scipy.optimize as opt
+from scipy.io import loadmat
+import pandas as pd
+import itertools
+
+
+#### Machine Learning With A Heart: Neural Network (using Feature Normalization) ####
+
+##Neural Network cost function with regularization##
+def nnCost(nn_params, input_layer_size, hidden_layer_size, num_labels, X, y, lmbda):  
+    ##reshape Theta1 and Theta2 from nn_params
+    Theta1=np.reshape(nn_params[0:hidden_layer_size * (input_layer_size + 1)], (hidden_layer_size, input_layer_size + 1))
+    Theta2=np.reshape(nn_params[hidden_layer_size * (input_layer_size + 1):], (num_labels, hidden_layer_size + 1))
+    ##create vectorized version of y
+    m=X.shape[0]
+    yVec=np.zeros((m,num_labels))
+    for i in range(m):
+        yVec[i,np.int(y[i].item(0))] = 1
+    
+    a1=np.append(np.matrix(np.ones(m)).transpose(),X,1) ##add a column of ones
+    a2=sigmoid(np.matmul(a1,Theta1.transpose()))
+    a2=np.append(np.matrix(np.ones(a2.shape[0])).transpose(),a2,1) ##add a column of ones
+    a3=sigmoid(np.matmul(a2,Theta2.transpose()))
+    J=np.sum(np.multiply(-yVec,np.log(a3)) - np.multiply((1-yVec),np.log(1-a3)), axis=None)/m
+    ##add regularization
+    Theta1_reg = np.zeros(Theta1.shape)
+    Theta1_reg[:,1:] = Theta1[:,1:]
+    Theta2_reg = np.zeros(Theta2.shape)
+    Theta2_reg[:,1:] = Theta2[:,1:]
+    J=J+lmbda*np.sum(np.power(Theta1_reg,2))/(2*m) ##Theta1 regularization
+    J=J+lmbda*np.sum(np.power(Theta2_reg,2))/(2*m) ##Theta1 regularization
+    return J
+
+##Neural Network gradient with regularization##
+def nnGrad(nn_params, input_layer_size, hidden_layer_size, num_labels, X, y, lmbda):  
+    ##reshape Theta1 and Theta2 from nn_params
+    Theta1=np.reshape(nn_params[0:hidden_layer_size * (input_layer_size + 1)], (hidden_layer_size, input_layer_size + 1))
+    Theta2=np.reshape(nn_params[hidden_layer_size * (input_layer_size + 1):], (num_labels, hidden_layer_size + 1))
+    ##create vectorized version of y
+    m=X.shape[0]
+    yVec=np.zeros((m,num_labels))
+    for i in range(m):
+        yVec[i,np.int(y[i].item(0))] = 1
+    
+    a1=np.append(np.matrix(np.ones(m)).transpose(),X,1) ##add a column of ones
+    a2=sigmoid(np.matmul(a1,Theta1.transpose()))
+    a2=np.append(np.matrix(np.ones(a2.shape[0])).transpose(),a2,1) ##add a column of ones
+    a3=sigmoid(np.matmul(a2,Theta2.transpose()))
+
+    delta3 = a3 - yVec
+    delta2 = np.multiply(np.dot(delta3,Theta2),np.multiply(a2,(1-a2)))
+    Delta1 = np.matmul(delta2[:,1:].transpose(),a1)
+    Delta2 = np.matmul(delta3.transpose(),a2)
+    Theta1_grad = Delta1/m
+    Theta2_grad = Delta2/m
+    ###add regularization
+    Theta1_reg = np.zeros(Theta1.shape)
+    Theta1_reg[:,1:] = Theta1[:,1:]
+    Theta2_reg = np.zeros(Theta2.shape)
+    Theta2_reg[:,1:] = Theta2[:,1:]
+    Theta1_grad = Theta1_grad + (lmbda/m)*Theta1_reg
+    Theta2_grad = Theta2_grad + (lmbda/m)*Theta2_reg
+    grad = np.append(np.array(Theta1_grad),np.array(Theta2_grad))
+    
+    return grad
+
+##Vectorized Sigmoid Function##
+def sigmoid(z):
+    return 1 / (1 + np.exp(- z))
+
+##Vectorized Sigmoid Gradient##
+def sigmoidGrad(z):
+    g=np.multiply(sigmoid(z),(1-sigmoid(z)))
+    return g
+
+##Randomly Initialize Weights for a given layer with L_in input connections and L_out output ones##
+def randInitWeights(L_in, L_out):
+    epsilon_init=0.12
+    W = np.random.rand(L_out,L_in+1)*2*epsilon_init - epsilon_init
+    return W
+
+##Feature Normalization##
+def featureNormalize(X):
+    mu = np.mean(X,axis=0)
+    std= np.std(X,axis=0)
+    X_norm=(X-mu)/std
+    return X_norm, mu, std
+
+## use a given value of theta to predict the label on each image##
+def predict(theta1, theta2, X):
+    m = X.shape[0]
+    a1=np.append(np.matrix(np.ones(m)).transpose(),X,1) ##add a column of ones
+    a2=sigmoid(np.matmul(a1,theta1.transpose()))
+    a2=np.append(np.matrix(np.ones(a2.shape[0])).transpose(),a2,1) ##add a column of ones
+    a3=sigmoid(np.matmul(a2,theta2.transpose()))
+    p = np.amax(a3,axis=1) ##maximum probability
+    g = np.where(a3==p)  ##location of max, i.e. label-1
+    return g, p
+
+
+##First read the data in and display a sample##
+dX = pd.read_csv('train_values.csv')
+dY = pd.read_csv('train_labels.csv')
+dT = pd.read_csv('test_values.csv')
+#print(dY)
+varnames=['slope_of_peak_exercise_st_segment', 'thal', 'resting_blood_pressure', 'chest_pain_type', 'num_major_vessels', 'fasting_blood_sugar_gt_120_mg_per_dl', 'resting_ekg_results', 'serum_cholesterol_mg_per_dl', 'oldpeak_eq_st_depression', 'sex', 'age', 'max_heart_rate_achieved', 'exercise_induced_angina']
+X = np.zeros((180,13))
+Xtest = np.zeros((90,13))
+m,n = X.shape
+mtest = Xtest.shape[0]
+Y = np.zeros((180,1))
+thals=dict()
+thals['normal'] = 0
+thals['reversible_defect'] = 1
+thals['fixed_defect'] = 2
+for i in range(m): ##each row corresponds to a patient
+    Y[i,0]=dY['heart_disease_present'][i]
+    k = int(i/2)
+    for j in range(len(varnames)):  ##each column corresponds to a variable
+        if j == 1:
+            X[i,j] = thals[dX[varnames[j]][i]]
+            Xtest[k,j] = thals[dT[varnames[j]][k]]
+        else:
+            X[i,j] = dX[varnames[j]][i]
+            Xtest[k,j] = dT[varnames[j]][k]
+
+
+##Setup Initial Parameters##
+input_layer_size=13
+hidden_layer_size=20
+num_labels=2
+lmbda=1  ##with regularization
+init_Theta1 = randInitWeights(input_layer_size, hidden_layer_size)
+init_Theta2 = randInitWeights(hidden_layer_size, num_labels)
+##unroll the parameters into a single vector##
+init_params = np.append(init_Theta1, init_Theta2)
+#J = nnCost(init_params, input_layer_size, hidden_layer_size, num_labels, X, Y, lmbda)
+predictions = dict()
+
+##TRY ADDING FEATURE NORMALIZATION##
+Xnorm, mu, sigma = featureNormalize(X)
+Xtnorm, tmu, tsigma = featureNormalize(Xtest)
+
+print('Training Neural Network with Feature Normalization (lambda = {})...'.format(lmbda))
+min_nn_params=opt.fmin_cg(nnCost, init_params, fprime=nnGrad, args=(input_layer_size, hidden_layer_size, num_labels, Xnorm, Y, lmbda), maxiter=20000)
+
+##reshape Theta1 and Theta2##
+mTheta1=np.reshape(min_nn_params[0:hidden_layer_size * (input_layer_size + 1)], (hidden_layer_size, input_layer_size + 1))
+mTheta2=np.reshape(min_nn_params[hidden_layer_size * (input_layer_size + 1):], (num_labels, hidden_layer_size + 1))
+pred, prob=predict(mTheta1, mTheta2, Xnorm)
+print('Prediction accuracy on our training set is', np.mean(pred[1]==Y.transpose())*100, '%')
+
+Tpred, Tprob = predict(mTheta1, mTheta2, Xtest)
+
+predictions['FNreg'] = np.multiply((1-Tpred[1].reshape((mtest,1))),(1-Tprob)) + np.multiply(Tpred[1].reshape((mtest,1)),Tprob)
+

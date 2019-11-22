@@ -235,3 +235,15 @@ pred['SVC'] = svclassifier.predict(Xtest)
 
 
 
+##TRY NAIVE BAYES CLASSIFIER##
+from sklearn.naive_bayes import GaussianNB, MultinomialNB
+NB = GaussianNB()
+MNB = MultinomialNB()
+print('\nFitting Naive-Bayes Classifiers... (this may take awhile)')
+NB.fit(X,np.array(Y))
+MNB.fit(X,np.array(Y))
+print('Done!')
+print('Gaussian Naive-Bayes: ', NB.score(X,np.array(Y)))
+predictions['NB'] = NB.predict(Xtest)
+print('Multinomial Naive-Bayes: ', MNB.score(X, np.array(Y)))
+predictions['MNB'] = MNB.predict(Xtest)

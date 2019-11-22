@@ -222,3 +222,16 @@ print('\nFitting the Gradient Boosting Classifier... (this may take awhile)')
 gbc.fit(X,Y)
 print('Done!')
 predictions['GBC'] = gbc.predict(Xtest)
+
+
+
+##TRY SUPPORT VECTOR MACHINES##
+svclassifier = SVC(kernel = 'linear')
+print('\nFitting SVM model... (this may take awhile)')
+svclassifier.fit(Xrand,np.array(Y[idx]))
+print('Done!')
+pred['SVC'] = svclassifier.predict(Xtest)
+##This takes way too long, even with a subset of the data, and isn't very accurate##
+
+
+

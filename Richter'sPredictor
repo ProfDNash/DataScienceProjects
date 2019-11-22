@@ -247,3 +247,14 @@ print('Gaussian Naive-Bayes: ', NB.score(X,np.array(Y)))
 predictions['NB'] = NB.predict(Xtest)
 print('Multinomial Naive-Bayes: ', MNB.score(X, np.array(Y)))
 predictions['MNB'] = MNB.predict(Xtest)
+
+
+
+##TRY A VOTING CLASSIFIER USING THE BEST MODELS SO FAR##
+from sklearn.ensemble import VotingClassifier
+VC = VotingClassifier(estimators=[('gbc', gbc), ('rf', RF), ('gnb', NB)], voting='soft')
+print('Fitting Voting Classifier... (this may take awhile)')
+VC.fit(X,np.array(Y))
+print('Done!')
+print(VC.score(X,np.array(Y)))
+predictions['Vote'] = VC.predict(Xtest)

@@ -178,3 +178,21 @@ Tpred, Tprob = predict(mTheta1, mTheta2, Xtest)
 
 predictions['reg'] = np.multiply((1-Tpred[1].reshape((mtest,1))),(1-Tprob)) + np.multiply(Tpred[1].reshape((mtest,1)),Tprob)
 
+
+##Random Forest Classifier##
+from sklearn.ensemble import RandomForestClassifier
+best = 0
+estimators = 0
+for i in [10,50,100,200,300]:
+    RF = RandomForestClassifier(n_estimators = i)
+    print('\nPerforming Random Forest Model Fit with {} estimators ... (this may take awhile)'.format(i))
+    RF.fit(X,np.array(Y))
+    print('Done!')
+    print('Model Score with {} estimators: '.format(i), RF.score(X,np.array(Y)))
+    if best<RF.score(X,np.array(Y)):
+        best = RF.score(X,np.array(Y))
+        estimators = i
+##best appears to be when i = 100-200
+RF = RandomForestClassifier(n_estimators = 100)
+RF.fit(X,np.array(Y))
+pred['RF'] = RF.predict(Xtest)

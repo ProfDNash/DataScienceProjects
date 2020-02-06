@@ -11,9 +11,10 @@ import random
 
 
 class Player:
-    def __init__(self, position, cards):
+    def __init__(self, position, cards, cursed):
         self.position = position
         self.cards = cards
+        self.cursed = cursed
         
 def initGame(numPlayers):
     global PlayerList
@@ -21,7 +22,7 @@ def initGame(numPlayers):
     if numPlayers<1 or numPlayers>4:
         print("Error, can only be played with 1 to 4 players")
     else:
-        PlayerList = [Player([0,0],[]), Player([0,0],[]), Player([0,0],[]), Player([0,0],[])]
+        PlayerList = [Player([0,0],[], False), Player([0,0],[], False), Player([0,0],[], False), Player([0,0],[], False)]
         PlayerList = PlayerList[:numPlayers]
         ##Shuffle the deck of cards
         Deck = np.random.permutation(Deck)
@@ -58,29 +59,32 @@ def cleanPositions(iP1): ##check for positions that are not allowed and eliminat
     return iP1
     
 
-def applyDie(iP1,die): ##apply a single die in all *allowable* ways
+def applyDie(iP1,die,curse): ##apply a single die in all *allowable* ways
     if die==0:
         die=10
     iP2 = np.array([])
     if iP1[0,0]==101:  ##do not allow movement away from position 101
         print("You already won... No need to keep rolling.")
     else:
-        iP2 = np.append(iP2, iP1+(die,0,0))
         iP2 = np.append(iP2, iP1-(die,0,0))
-        iP2 = np.append(iP2, iP1*(die,1,1))
         iP2 = np.append(iP2, iP1/(die,1,1))
+        if curse==False:  ##when cursed, you can only subtract or divide
+            iP2 = np.append(iP2, iP1+(die,0,0))
+            iP2 = np.append(iP2, iP1*(die,1,1))
         if iP1[0,1]!=101: ##do not allow movement away from position 101
-            iP2 = np.append(iP2, iP1+(0,die,0))
             iP2 = np.append(iP2, iP1-(0,die,0))
-            iP2 = np.append(iP2, iP1*(1,die,1))
             iP2 = np.append(iP2, iP1/(1,die,1))
+            if curse==False:  ##when cursed, you can only subtract or divide
+                iP2 = np.append(iP2, iP1+(0,die,0))
+                iP2 = np.append(iP2, iP1*(1,die,1))
         num = np.int(iP2.shape[0]/3)
         ##transfer data to iP1
         iP1 = iP2.reshape((num,3))
         iP1 = cleanPositions(iP1) #sort, eliminate duplicates and unallowable positions
     return iP1
 
-def applyCard(iP1, card):
+def applyCard(iP1, card, playerNum):
+    global PlayerList
     iP2 = np.array([])
     if 0<card<10:
         if iP1[0,0]==101:
@@ -95,15 +99,24 @@ def applyCard(iP1, card):
                 if iP1[i,1]!=101:
                     iP2 = np.append(iP2, iP1[i,:]+(0,card,10**(9-card)))
                     iP2 = np.append(iP2, iP1[i,:]-(0,card,-10**(9-card)))
-            #iP2 = np.append(iP2, iP1+(card,0,10**(card-1)))
-            #iP2 = np.append(iP2, iP1-(card,0,-10**(card-1)))
-            #if iP1[0,1]!=101:
-            #    iP2 = np.append(iP2, iP1+(0,card,10**(card-1)))
-            #    iP2 = np.append(iP2, iP1-(0,card,-10**(card-1)))
             num = np.int(iP2.shape[0]/3)
             iP1 = iP2.reshape((num,3))
             iP1 = cleanPositions(iP1)
+    ##else card = 11 or 12 needs to be added
     return iP1
+
+def cursePlayer(card, playerNum):
+    global DiscardPile
+    if card !=13 or card != 14:
+        print('Error.  You cannot curse with that card.')
+    else:
+        if len(PlayerList)>1:  ##only curse other players if other players exist
+            pToCurse = playerNum
+            while pToCurse = playerNum or PlayerList[pToCurse].curse == True:  ##don't curse a player who is already cursed
+                pToCurse = np.random.randint(0,len(PlayerList))
+            PlayerList[pToCurse].curse = True
+        PlayerList[playerNum].cards.remove(card)
+        DiscardPile.append(card)
 
     
 ##function to determine all possible moves given a particular roll and starting position
@@ -120,7 +133,8 @@ def moveMapper(roll, pos, availCards):
     else:
         scheme = np.array([str(roll[0]),str(roll[1])])
     for c in range(len(availCards)):
-        scheme = np.append(scheme, 'c'+str(availCards[c]))
+        if 0<availCards[c]<10:  ##may want to extend this to cards 11 and 12...
+            scheme = np.append(scheme, 'c'+str(availCards[c]))
     scheme = set(permutations(scheme))
     intermediatePos3 = np.array([])
     for order in scheme:
@@ -274,6 +288,14 @@ def drawACard(playerNum,oldPos,newPos):
 
 def takeTurn(playerNum):
     global PlayerList
+    if 13 in PlayerList[playerNum].cards:
+        curseFlag = np.random.randint(0,2) ##randomly choose whether to use the card or not
+        card = 13
+    elif 14 in PlayerList[playerNum.cards]:
+        curseFlag = np.random.randint(0,2)
+        card = 14
+    if curseFlag == 1:
+        cursePlayer(card,playerNum)
     pos = PlayerList[playerNum].position
     #print("Current position:", pos)
     roll = [np.random.randint(0,10),np.random.randint(0,10)]
@@ -305,6 +327,7 @@ def takeTurn(playerNum):
     ##Check for bumping, note: self bumping is already achieved in moveMapper
     bumpChecker(playerNum)
     ##Check for drawing a card and using it if it is an action card
+    PlayerList[playerNum].curse = False  ##undo any curses at the end of the turn
     if drawACard(playerNum, pos, Move[0:2]):
         return playerNum ##take another turn!
     else:

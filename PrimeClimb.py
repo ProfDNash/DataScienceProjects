@@ -107,8 +107,8 @@ def applyCard(iP1, card):
 
 def cursePlayer(card, playerNum):
     global DiscardPile
-    if card !=12 or card != 13:
-        print('Error.  You cannot curse with that card.')
+    if card !=12 and card != 13:
+        print('Error.  You cannot curse with card ', card)
     else:
         if len(PlayerList)>1:  ##only curse other players if other players exist
             pToCurse = playerNum

@@ -83,7 +83,7 @@ def applyDie(iP1,die,curse): ##apply a single die in all *allowable* ways
         iP1 = cleanPositions(iP1) #sort, eliminate duplicates and unallowable positions
     return iP1
 
-def applyCard(iP1, card, playerNum):
+def applyCard(iP1, card):
     global PlayerList
     iP2 = np.array([])
     if 0<card<10:
@@ -107,12 +107,12 @@ def applyCard(iP1, card, playerNum):
 
 def cursePlayer(card, playerNum):
     global DiscardPile
-    if card !=13 or card != 14:
+    if card !=12 or card != 13:
         print('Error.  You cannot curse with that card.')
     else:
         if len(PlayerList)>1:  ##only curse other players if other players exist
             pToCurse = playerNum
-            while pToCurse = playerNum or PlayerList[pToCurse].curse == True:  ##don't curse a player who is already cursed
+            while pToCurse == playerNum or PlayerList[pToCurse].curse == True:  ##don't curse a player who is already cursed
                 pToCurse = np.random.randint(0,len(PlayerList))
             PlayerList[pToCurse].curse = True
         PlayerList[playerNum].cards.remove(card)
@@ -120,7 +120,7 @@ def cursePlayer(card, playerNum):
 
     
 ##function to determine all possible moves given a particular roll and starting position
-def moveMapper(roll, pos, availCards):
+def moveMapper(roll, pos, availCards, curse):
     partialFlag = 0
     intermediatePos1 = np.array(pos)
     intermediatePos1 = np.append(intermediatePos1, 1000000000)
@@ -146,7 +146,7 @@ def moveMapper(roll, pos, availCards):
                 ##ALSO Keep track of positions without using the card!
                 intermediatePos2 = np.append(intermediatePos2, applyCard(intermediatePos2, int(item[1:])), axis=0)
             else:
-                intermediatePos2 = applyDie(intermediatePos2, int(item))
+                intermediatePos2 = applyDie(intermediatePos2, int(item), curse)
             if 101 in intermediatePos2[:,0]: ##you can win on a partial turn
                 intermediatePos2 = np.array([101,101,1000000000])
                 partialFlag = 1
@@ -288,19 +288,20 @@ def drawACard(playerNum,oldPos,newPos):
 
 def takeTurn(playerNum):
     global PlayerList
-    if 13 in PlayerList[playerNum].cards:
+    curseFlag = 0
+    if 12 in PlayerList[playerNum].cards:
         curseFlag = np.random.randint(0,2) ##randomly choose whether to use the card or not
-        card = 13
-    elif 14 in PlayerList[playerNum.cards]:
+        card = 12
+    elif 13 in PlayerList[playerNum].cards:
         curseFlag = np.random.randint(0,2)
-        card = 14
+        card = 13
     if curseFlag == 1:
         cursePlayer(card,playerNum)
     pos = PlayerList[playerNum].position
     #print("Current position:", pos)
     roll = [np.random.randint(0,10),np.random.randint(0,10)]
     #print("Roll:", roll)
-    possibleMoves = moveMapper(roll,pos,PlayerList[playerNum].cards)
+    possibleMoves = moveMapper(roll,pos,PlayerList[playerNum].cards,PlayerList[playerNum].cursed)
     #print("Possible Moves:\n", possibleMoves)
     if 101 in possibleMoves[:,0]:
         Move = np.array([101,101]).reshape((1,2)) ##win if you can

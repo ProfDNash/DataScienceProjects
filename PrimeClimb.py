@@ -7,7 +7,7 @@ Created on Fri Jan 24 07:32:32 2020
 import numpy as np
 from itertools import permutations
 #from sympy.utilities.iterables import multiset_permutations ##alternative way for generating all permutations
-import random
+#import random
 
 
 class Player:
@@ -86,27 +86,32 @@ def applyDie(iP1,die,curse): ##apply a single die in all *allowable* ways
 def applyCard(iP1, card):
     global PlayerList
     iP2 = np.array([])
-    if 0<card<10:
-        if iP1[0,0]==101:
-            print("No need to apply cards... you already won!")
-        else:
+    if iP1[0,0]==101:
+        print("No need to apply cards... you already won!")
+    else:
+        if 0<card<10:
             ##make sure you only apply cards which haven't already been used
             for i in range(iP1.shape[0]):
                 if str(iP1[i,2])[card] == '1': ##then card has already been used
                     continue
-                iP2 = np.append(iP2, iP1[i,:]+(card,0,10**(9-card))) ##so card corresponds to digit number card
-                iP2 = np.append(iP2, iP1[i,:]-(card,0,-10**(9-card)))
+                iP2 = np.append(iP2, iP1[i,:]+(card,0,10**(11-card))) ##so card corresponds to digit number card
+                iP2 = np.append(iP2, iP1[i,:]-(card,0,-10**(11-card)))
                 if iP1[i,1]!=101:
-                    iP2 = np.append(iP2, iP1[i,:]+(0,card,10**(9-card)))
-                    iP2 = np.append(iP2, iP1[i,:]-(0,card,-10**(9-card)))
-            num = np.int(iP2.shape[0]/3)
-            iP1 = iP2.reshape((num,3))
-            iP1 = cleanPositions(iP1)
-    ##else card = 11 or 12 needs to be added
+                    iP2 = np.append(iP2, iP1[i,:]+(0,card,10**(11-card)))
+                    iP2 = np.append(iP2, iP1[i,:]-(0,card,-10**(11-card)))
+        elif 9<card<12:  ##these cards will bump a pawn back to start
+            for i in range(iP1.shape[0]):
+                iP2 = np.append(iP2,np.array([0,iP1[i,1],100000000000+10**(11-card)]))  ##move lower pawn
+                if iP1[i,1]!=101:
+                    iP2 = np.append(iP2,np.array([0,iP1[i,0],100000000000+10**(11-card)]))  ##move higher pawn
+        num = np.int(iP2.shape[0]/3)
+        iP1 = iP2.reshape((num,3))
+        iP1 = cleanPositions(iP1)
     return iP1
 
 def cursePlayer(card, playerNum):
     global DiscardPile
+    global PlayerList
     if card !=12 and card != 13:
         print('Error.  You cannot curse with card ', card)
     else:
@@ -118,12 +123,36 @@ def cursePlayer(card, playerNum):
         PlayerList[playerNum].cards.remove(card)
         DiscardPile.append(card)
 
+def sendPlayerHome(card, playerNum):
+    global DiscardPile
+    global PlayerList
+    if card !=10 and card != 11:
+        print('Error.  You cannot bump with card ', card)
+    else:
+        offStart = 0
+        for j in range(len(PlayerList)):
+            if j!= playerNum:
+                offStart = offStart + PlayerList[j].position[1]
+        if offStart>0:  ##then there are players to bump which aren't at the start 
+            pToBump = playerNum
+            while pToBump == playerNum or PlayerList[pToBump].position[1]==0:  ##don't bump a player who's pawns are both at the start
+                pToBump = np.random.randint(0,len(PlayerList))
+            if PlayerList[pToBump].position[0]==0:
+                pawnChosen = 1
+            else:
+                pawnChosen=np.random.randint(0,2)
+            PlayerList[pToBump].position[pawnChosen]=0
+            PlayerList[pToBump].position.sort()
+            PlayerList[playerNum].cards.remove(card)
+            DiscardPile.append(card)
+        else:
+            print("No one to bump.")
     
 ##function to determine all possible moves given a particular roll and starting position
 def moveMapper(roll, pos, availCards, curse):
     partialFlag = 0
     intermediatePos1 = np.array(pos)
-    intermediatePos1 = np.append(intermediatePos1, 1000000000)
+    intermediatePos1 = np.append(intermediatePos1, 100000000000)
     #intermediatePos2 = intermediatePos1.reshape((1,3)) ##hopefully a distinct copy of the array
     #intermediatePos1 = intermediatePos1.reshape((1,3))
     ##use the digits to keep track of which cards have been used i.e. 4 has been used means add 10^4
@@ -133,9 +162,22 @@ def moveMapper(roll, pos, availCards, curse):
     else:
         scheme = np.array([str(roll[0]),str(roll[1])])
     for c in range(len(availCards)):
-        if 0<availCards[c]<10:  ##may want to extend this to cards 11 and 12...
+        if 0<availCards[c]<12:  ##this now includes the send home cards
             scheme = np.append(scheme, 'c'+str(availCards[c]))
     scheme = set(permutations(scheme))
+    ##it only makes logical sense to move yourself home at the beginning of your turn, otherwise you waste dice
+    if 10 in availCards or 11 in availCards:
+        keepset = []
+        for x in scheme:
+            if x[0]=='c10' or x[0]=='c11':
+                keepset.append(x)
+        if 10 in availCards and 11 in availCards:
+            scheme = []
+            for x in keepset:
+                if x[1]=='c10' or x[1]=='c11':
+                    scheme.append(x)
+        else:
+            scheme = keepset
     intermediatePos3 = np.array([])
     for order in scheme:
         #print(order)
@@ -148,7 +190,7 @@ def moveMapper(roll, pos, availCards, curse):
             else:
                 intermediatePos2 = applyDie(intermediatePos2, int(item), curse)
             if 101 in intermediatePos2[:,0]: ##you can win on a partial turn
-                intermediatePos2 = np.array([101,101,1000000000])
+                intermediatePos2 = np.array([101,101,100000000000])
                 partialFlag = 1
                 break
         intermediatePos3 = np.append(intermediatePos3,intermediatePos2)
@@ -166,9 +208,9 @@ def moveMapper(roll, pos, availCards, curse):
             else:
                 finalPos[i,0]=0
     ##RE-SORT AND REMOVE DUPLICATES##
-    finalPos = np.delete(finalPos, delRow.astype(int), axis=0)
+    finalPos = np.delete(finalPos, delRow.astype('i8'), axis=0)
     finalPos.view('i8,i8,i8').sort(order=['f0','f1'], axis=0)
-    return finalPos.astype(int)
+    return finalPos.astype('i8')
 
 def bumpChecker(playerNum):
     global PlayerList
@@ -288,7 +330,7 @@ def drawACard(playerNum,oldPos,newPos):
 
 def takeTurn(playerNum):
     global PlayerList
-    curseFlag = 0
+    curseFlag = 0  ##used to decide whether to curse another player
     if 12 in PlayerList[playerNum].cards:
         curseFlag = np.random.randint(0,2) ##randomly choose whether to use the card or not
         card = 12
@@ -318,17 +360,37 @@ def takeTurn(playerNum):
         ##choose a random move
         Move = possibleMoves[np.random.randint(0,possibleMoves.shape[0])]
     #print("******\n",possibleMoves,"\n******")
-    if Move.shape[0]>2 and Move[2] != 1000000000: ##if cards were used, remove them from hand
-        for i in range(1,len(str(Move[2]))):
-            if str(Move[2])[i]=='1':
-                PlayerList[playerNum].cards.remove(i)
-                DiscardPile.append(i) ##add used cards to discard pile
+    if Move.shape[0]>2 and Move[2] != 100000000000: ##if cards were used, remove them from hand
+        ##ADD CHECK TO AVOID USING CARDS IF IT IS POSSIBLE TO GET TO THE CHOSEN LOCATION WITH FEWER OF THEM
+        x = np.where(possibleMoves[:,0]==Move[0])[0]
+        y = np.where(possibleMoves[:,1]==Move[1])[0]
+        matches = np.intersect1d(x,y)  ##finds indices of all locations matching chosen Move
+        bestMove = possibleMoves[matches[0],:]  ##first in the list should have the lowest third entry (saving lower cards)
+        for j in range(len(matches)):
+            if sum(int(digit) for digit in str(possibleMoves[j,2])[1:]) < sum(int(digit) for digit in str(bestMove[2])[1:]):
+                bestMove = possibleMoves[j,:]
+        #if bestMove[2] != Move[2]:
+        #    print("Move Changed!", Move[2], " to ", bestMove[2])
+        Move = bestMove
+        if Move[2] != 100000000000:  ##recheck if any cards were used
+            for i in range(1,len(str(Move[2]))):
+                if str(Move[2])[i]=='1':
+                    PlayerList[playerNum].cards.remove(i)
+                    DiscardPile.append(i) ##add used cards to discard pile
     PlayerList[playerNum].position = Move[0:2]
     #print("New position:", Move[0:2])
     ##Check for bumping, note: self bumping is already achieved in moveMapper
     bumpChecker(playerNum)
     ##Check for drawing a card and using it if it is an action card
     PlayerList[playerNum].curse = False  ##undo any curses at the end of the turn
+    ##if the player did not use the send home cards to augment their own move, they can choose to send someone else back
+    if 10 in PlayerList[playerNum].cards:
+        if np.random.randint(0,2)==1:
+            sendPlayerHome(10,playerNum)
+    if 11 in PlayerList[playerNum].cards:
+        if np.random.randint(0,2)==1:
+            sendPlayerHome(11,playerNum)
+    ## after all actions, check to see if they get to draw a card 
     if drawACard(playerNum, pos, Move[0:2]):
         return playerNum ##take another turn!
     else:
@@ -394,7 +456,7 @@ PlayerList = []
 numberOfGames = 0
 totalTurns = 0
 playerWins = [0,0,0,0]
-while numberOfGames < 1000:
+while numberOfGames < 4:
     print("Game Number:", numberOfGames+1)
     Deck = np.arange(1,25)
     DiscardPile = []

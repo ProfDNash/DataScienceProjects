@@ -394,12 +394,12 @@ PlayerList = []
 numberOfGames = 0
 totalTurns = 0
 playerWins = [0,0,0,0]
-while numberOfGames < 4:
+while numberOfGames < 1000:
     print("Game Number:", numberOfGames+1)
     Deck = np.arange(1,25)
     DiscardPile = []
-    PlayerList = initGame(2)
-    turns, winner = playGame(2)
+    PlayerList = initGame(3)
+    turns, winner = playGame(3)
     totalTurns += turns
     playerWins[winner] += 1
     numberOfGames += 1
@@ -407,5 +407,6 @@ while numberOfGames < 4:
 print("Avg # Turns to Victory:", totalTurns/numberOfGames)
 print("Number of Wins for Each Player:", playerWins)
         
-##over 40 games playing "randomly" avg number of turns is 54.125 w/o card stealing or pawn swapping       
+##over 40 games playing "randomly" avg number of turns is 54.125 w/o card stealing or pawn swapping
+##over 1000 games, with two players, no sending home, avg # of turns is 71.67  wins 518 to 482       
 

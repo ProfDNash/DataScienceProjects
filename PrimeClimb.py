@@ -6,6 +6,7 @@ Created on Fri Jan 24 07:32:32 2020
 
 import numpy as np
 from itertools import permutations
+import time
 #from sympy.utilities.iterables import multiset_permutations ##alternative way for generating all permutations
 #import random
 
@@ -412,13 +413,50 @@ def playGame(numPlayers):
             break
     return nTurns, (-currPlayer-1)
     
-    
-      
+
+##Create a lookup table of probabilities of getting either 1st or second pawn out
+def createLookup():  ##first, only allow 1 card to be used in a turn
+    global Positions
+    #start_time = time.time()
+    evenCols = [0,2,4,6,8,10,12,14,16,18]
+    L = np.zeros((Positions.shape[0],20)) ##two columns for each card, and two columns for no cards
+    percentage=0
+    for p in range(6):#Positions.shape[0]):
+        if p%5==0:
+            print("~", percentage, "% completed")
+            percentage += 1
+            #if percentage == 2:
+            #    end_time = time.time()
+            #    print("Time elapsed:", end_time - start_time)
+        for die1 in range(10):
+            for die2 in range(die1,10):
+                if die1==die2:
+                    prob = 1/100
+                else:
+                    prob = 1/50
+                Moves = moveMapper([die1,die2],Positions[p,:], [], False)
+                if 101 in Moves[:,0]:
+                    L[p,:] += prob  ##if you can win without cards, no need to calculate with cards
+                    if Positions[p,1]==101:
+                        L[p,evenCols] -= prob ##don't reward for pawns that are already out
+                    break
+                else:  ##we have to actually compute the outcomes with each possible card
+                    if 101 in Moves[:,1]:
+                        L[p,0] += prob  ##if you can get a pawn out with no cards...
+                        if Positions[p,1]==101:
+                            L[p,evenCols] -= prob  #again, don't reward if one pawn is already out
+                    for card in [1,2,3,4,5,6,7,8,9]:
+                        Moves = moveMapper([die1,die2],Positions[p,:],[card],False)
+                        if 101 in Moves[:,0]:
+                            L[p,card*2+1] += prob
+                        if 101 in Moves[:,1] and Positions[p,1]!=101:
+                            L[p,card*2] += prob
+    return L
     
     
 
 
-#Positions=posCreator()
+Positions=posCreator()
 Spots = np.arange(102)
 Primes = [11,13,17,19,23,29,31,37,41,43,47,53,59,61,67,71,73,79,83,89,97]
 Cards = {
@@ -460,8 +498,8 @@ while numberOfGames < 4:
     print("Game Number:", numberOfGames+1)
     Deck = np.arange(1,25)
     DiscardPile = []
-    PlayerList = initGame(3)
-    turns, winner = playGame(3)
+    PlayerList = initGame(4)
+    turns, winner = playGame(4)
     totalTurns += turns
     playerWins[winner] += 1
     numberOfGames += 1

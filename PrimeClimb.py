@@ -7,6 +7,7 @@ Created on Fri Jan 24 07:32:32 2020
 import numpy as np
 from itertools import permutations
 import time
+import matplotlib as plt
 #from sympy.utilities.iterables import multiset_permutations ##alternative way for generating all permutations
 #import random
 
@@ -494,7 +495,7 @@ PlayerList = []
 numberOfGames = 0
 totalTurns = 0
 playerWins = [0,0,0,0]
-while numberOfGames < 4:
+while numberOfGames < 1:
     print("Game Number:", numberOfGames+1)
     Deck = np.arange(1,25)
     DiscardPile = []
@@ -508,5 +509,208 @@ print("Avg # Turns to Victory:", totalTurns/numberOfGames)
 print("Number of Wins for Each Player:", playerWins)
         
 ##over 40 games playing "randomly" avg number of turns is 54.125 w/o card stealing or pawn swapping
-##over 1000 games, with two players, no sending home, avg # of turns is 71.67  wins 518 to 482       
+##over 1000 games, with two players, no sending home, avg # of turns is 71.67  wins 518 to 482    
+##over 1000 games, with three players, avg # of turns is 88.738, wins: 333 to 334 to 333
+
+
+
+
+
+
+##Randomly Initialize Weights for a given layer with L_in input connections and L_out output ones##
+def randInitWeights(L_in, L_out):
+    epsilon_init=0.12
+    W = np.random.rand(L_out,L_in+1)*2*epsilon_init - epsilon_init
+    return W
+
+##Vectorized Sigmoid Function##
+def sigmoid(z):
+    return 1 / (1 + np.exp(- z))
+
+##Generate Predicted Outcome given t-th turn in game##
+def pred(nn_params, iLsize, hL1size, numOutcomes, Xt):  
+    ##reshape Theta1 and Theta2 from nn_params
+    Theta1=np.reshape(nn_params[0:hL1size * (iLsize + 1)], (hL1size, iLsize + 1))
+    Theta2=np.reshape(nn_params[hL1size * (iLsize + 1):], (numOutcomes, hL1size + 1))
+    
+    a1=np.append(1,Xt) ##add a single one to the front of the state vector
+    a2=sigmoid(np.matmul(a1,Theta1.transpose()))
+    a2=np.append(1,a2) ##add a single one to the front
+    a3=sigmoid(np.matmul(a2,Theta2.transpose()))
+    return a3
+
+##Neural Network gradient##
+def Grad(nn_params, iLsize, hL1size, numOutcomes, Xt, y, lmbda):  
+    ##reshape Theta1 and Theta2 from nn_params
+    Theta1=np.reshape(nn_params[0:hL1size * (iLsize + 1)], (hL1size, iLsize + 1))
+    Theta2=np.reshape(nn_params[hL1size * (iLsize + 1):], (numOutcomes, hL1size + 1))
+    
+    a1=np.append(1,Xt) ##add a single one to the front of the state vector
+    a2=sigmoid(np.matmul(a1,Theta1.transpose()))
+    a2=np.append(1,a2) ##add a aingle one to the front
+    a3=sigmoid(np.matmul(a2,Theta2.transpose()))
+
+    delta3 = a3 - y
+    delta2 = np.multiply(np.dot(delta3,Theta2),np.multiply(a2,(1-a2)))
+    Delta1 = np.matmul(delta2[:,1:].transpose(),a1)
+    Delta2 = np.matmul(delta3.transpose(),a2)
+    Theta1_grad = Delta1/m
+    Theta2_grad = Delta2/m
+    ###add regularization
+    #Theta1_reg = np.zeros(Theta1.shape)
+    #Theta1_reg[:,1:] = Theta1[:,1:]
+    #Theta2_reg = np.zeros(Theta2.shape)
+    #Theta2_reg[:,1:] = Theta2[:,1:]
+    #Theta1_grad = Theta1_grad + (lmbda/m)*Theta1_reg
+    #Theta2_grad = Theta2_grad + (lmbda/m)*Theta2_reg
+    grad = np.append(np.array(Theta1_grad),np.array(Theta2_grad))
+    
+    return grad
+
+##Numerical Gradient w.r.t. weights
+def numGrad(nn_params, iLsize, hL1size, numOutcomes, Xt):  
+    delta = .00001
+    grad = np.zeros(nn_params.shape[0])
+    Delta = np.zeros(nn_params.shape[0])
+    for i in range(nn_params.shape[0]):
+        Delta[i] = delta
+        grad[i] = np.sum((pred(nn_params+Delta, iLsize, hL1size, numOutcomes, Xt) - pred(nn_params-Delta, iLsize, hL1size, numOutcomes, Xt)))/(2*delta)
+        Delta[i] = 0
+    return grad
+    
+    
+
+##Choose the next position by selecting the maximum potential reward among all possible moves
+def chooseMove(nn_params, iLsize, hL1size, numOutcomes, Xt, Rand):
+    Xnext = np.zeros(8)
+    if Xt[4]==1:  ##it's player 0's turn
+        pos1 = Xt[0:2]
+        pos2 = Xt[2:4]
+        Xnext[5]=1
+    else:  ##it's player 1's turn
+        pos1 = Xt[2:4]
+        pos2 = Xt[0:2]
+        Xnext[4]=1
+    possMoves = moveMapper(Xt[6:8],pos1,[],False)
+    if 101 in possMoves[:,0]:
+        Xnext[2*Xt[5]] = 101
+        Xnext[2*Xt[5]+1] = 101
+        Xnext[2*Xt[4]] = pos2[0]
+        Xnext[2*Xt[4]+1] = pos2[1]
+    else:  ##choose the move that has the best average possibility of victory (for the current player) over all possible turns for the next player
+        if Rand == 0:
+            best = 0
+            bestidx = 0
+            for i in range(possMoves.shape[0]):
+                Xnext[2*Xt[5]] = possMoves[i,0]
+                Xnext[2*Xt[5]+1] = possMoves[i,1]
+                temp = [0,0]
+                if pos2[0] not in possMoves[i,0:2]:
+                    temp[0]=pos2[0]
+                if pos2[1] not in possMoves[i,0:2]:
+                    temp[1]=pos2[1]
+                temp.sort()
+                Xnext[2*Xt[4]] = temp[0]
+                Xnext[2*Xt[4]+1] = temp[1]
+                total = 0
+                for die1 in range(10):
+                    for die2 in range(die1,10):
+                        multiplier = 1
+                        if die1==die2:
+                            multiplier = 2
+                        Xnext[6]=die1
+                        Xnext[7]=die2
+                        total += pred(nn_params, iLsize, hL1size, numOutcomes, Xnext)[Xt[5]]*multiplier
+                average = total/100
+                if average > best:
+                    best = average
+                    bestidx = i
+        else:
+            bestidx = np.random.randint(0,possMoves.shape[0])
+        Xnext[2*Xt[5]] = possMoves[bestidx,0]
+        Xnext[2*Xt[5]+1] = possMoves[bestidx,1]
+        temp = [0,0]
+        if pos2[0] not in possMoves[bestidx,0:2] or pos2[0]==101:
+            temp[0]=pos2[0]
+        if pos2[1] not in possMoves[bestidx,0:2] or pos2[1]==101:
+            temp[1]=pos2[1]
+        temp.sort()
+        Xnext[2*Xt[4]] = temp[0]
+        Xnext[2*Xt[4]+1] = temp[1]
+    return Xnext[0:6]
+
+
+def learn(nn_params, iLsize, hL1size, numOutcomes, Xinitial,lmbda, alpha):
+    Xt = Xinitial
+    Yt = pred(nn_params, iLsize, hL1size, numOutcomes, Xt).reshape((2,1))
+    GradW = numGrad(nn_params, iLsize, hL1size, numOutcomes, Xt).reshape((nn_params.shape[0],1))
+    turns = 0
+    #print("Current game state: ", Xt)
+    #print("Prediction: ", Yt[:,turns])
+    addRandomness = np.array([0,0])
+    winner = 0
+    while Xt[0]!=101 and Xt[2]!=101:
+        Xn = chooseMove(nn_params, iLsize, hL1size, numOutcomes, Xt, 0).astype(int)
+        if np.all(Xn[2*Xt[5]:2*Xt[5]+2]==Xt[2*Xt[5]:2*Xt[5]+2]):
+            addRandomness = addRandomness + Xt[4:6]
+        else:
+            addRandomness[Xt[5]] = 0
+        if addRandomness[Xt[5]]>3:
+            Xt = chooseMove(nn_params, iLsize, hL1size, numOutcomes, Xt, 1).astype(int)
+            #print("Randomness added!")
+        else:
+            Xt = Xn
+        Xt = np.append(Xt,[np.random.randint(0,10), np.random.randint(0,10)]) ##generate a new roll
+        GradW = np.append(GradW, numGrad(nn_params, iLsize, hL1size, numOutcomes, Xt).reshape((nn_params.shape[0],1)), axis = 1)
+        turns += 1
+        if Xt[0]==101:
+            Yt = np.append(Yt, np.array([1,0]).reshape((2,1)), axis=1)
+        elif Xt[2]==101:
+            Yt = np.append(Yt, np.array([0,1]).reshape((2,1)), axis=1)
+            winner = 1
+        else:
+            Yt = np.append(Yt,pred(nn_params, iLsize, hL1size, numOutcomes, Xt).reshape((2,1)), axis=1)
+        #print("Current game state: ", Xt)
+        #print("Prediction: ", Yt[:,turns])
+        ##Now, use the TD(lambda) algorithm to adjust the weights
+        sigma = 0
+        for k in range(turns):
+            sigma += lmbda**(turns-k)*GradW[:,k]
+        GRAD = np.sum(Yt[:,turns] - Yt[:,turns-1])*sigma
+        nn_params = nn_params + alpha*GRAD  ##update weights each turn
+    #print("Turns to completion: ", turns)
+    #print("Prediction on winning turn: ", Yt[:,turns-1])
+    #print("Winner: Player", winner)
+    return nn_params, turns
+    
+    
+
+##BUILD A NEURAL-NETWORK FOR A TEMPORAL DIFFERENCE LEARNING MODEL##
+alpha = 0.3 ##learning rate
+lmbda = 0.5
+iLsize = 8  ##P1 pawns, P2 pawns, hot-encoding for whose turn it is, and two dice rolled
+##should we later add inputs for who has each card?
+hL1size = 60
+hL2size = 20
+numOutcomes = 2  ##hot-encoding P1 wins or P2 wins  (should their be an intermediate step for getting a pawn out?)   
+init_Theta1 = randInitWeights(iLsize, hL1size)
+init_Theta2 = randInitWeights(hL1size, numOutcomes)
+##unroll the parameters into a single vector##
+init_params = np.append(init_Theta1, init_Theta2)
+
+def train(init_params, numGames, iLsize, hL1size, numOutcomes, Xinitial, lmbda, alpha):    
+    final_params = init_params
+    numberTurns=[]
+    for game in range(numGames):
+        Xinitial = [0,0,0,0,1,0,np.random.randint(0,10), np.random.randint(0,10)]
+        final_params, t = learn(final_params, iLsize, hL1size, numOutcomes, Xinitial, lmbda, alpha)
+        print("Game: ", game, " Turns to Completion: ", t)
+        numberTurns.append(t)
+    return final_params, numberTurns
+
+
+
+#https://researcher.watson.ibm.com/researcher/view_page.php?id=7021
+#https://www.ece.uvic.ca/~bctill/papers/learning/Tesauro_1992.pdf
+
 

@@ -55,10 +55,15 @@ TrueNames = {
 ##First, gather data about the number of articles in each category##
 yearList = ['92','93','94','95','96','97','98','99','00','01','02','03','04','05',
             '06','07','08','09','10','11','12','13','14','15','16','17','18','19']
-yearCounts = pd.DataFrame(columns=['Year', 'Category', 'Count'])
-names = list()
-counts = list()
+#yearCounts = pd.DataFrame(columns=['Year', 'Category', 'Count'])
+#names = list()
+#counts = list()
 pal = sns.color_palette('bright',10)+sns.color_palette('dark',10)+sns.color_palette('pastel',10)+sns.color_palette('Set1',10)
+rain = sns.color_palette(['#990000','#FF0000','#FF9999','#993300','#FF3300','#FF9966','#CC9900','#FFFF00','#003300',
+                          '#006600','#00FF00','#003333','#006666','#00CCCC','#003399','#0033FF','#0099FF','#000066',
+                          '#000099','#0000FF','#330066','#660099','#9900CC','#9966FF','#660066','#990066','#FF0099',
+                          '#FF66FF','#000000','#666666','#CCCC99','#663300'])
+rain2 = sns.color_palette('husl',8)+sns.color_palette('bright',6)+sns.color_palette('pastel',6)+sns.color_palette('dark',6)+sns.color_palette('Set1',6)
 
 def gatherData():
     global yearList
@@ -83,40 +88,33 @@ def gatherData():
             yearCounts.loc[row] = [yearLabel,TrueNames[cat[0]],annualCounts[-1]]
             row+=1
         counts.append(sum(annualCounts))
-  
+    yearCounts.Year = yearCounts.Year.astype(int)
+    yearCounts.Count = yearCounts.Count.astype(int)
     
 
 ##Plot Total Counts##
-def plotTotals(names, counts):
+def plotTotals():
+    global names
+    global counts
     data = {"Category":names, "Number of Articles":counts}
     df = pd.DataFrame(data)
     df = df.sort_values(by=["Number of Articles"])
     plt.figure(figsize=(10,5))
-    chart = sns.barplot(x=df["Category"], y=df["Number of Articles"], palette='Set1')
+    chart = sns.barplot(x=df["Category"], y=df["Number of Articles"], palette=sns.color_palette('Spectral',31))
     chart.set_xticklabels(chart.get_xticklabels(), rotation=45, horizontalalignment='right')
-    #df.plot.bar(x='Category', y='Number of Articles', legend=None)
-    #sns.barplot(x=df["Category"], y=df["Number of Articles"])
-    #sns.set_palette(sns.color_palette('Set1',len(df)))
-    #sns.set_palette(pal,len(df))
-    #ax1.set_prop_cycle('color', colors)
     plt.title('Total Number of Articles by Category', color='black')
     plt.savefig('Totals.png', bbox_inches='tight')
     plt.show()
 
 ##Plot Counts by Year##
 def plotLines():
-    #yC = yearCounts.pivot(index='Year', columns='Category', values = 'Count')
-    yearCounts.Year = yearCounts.Year.astype(int)
-    yearCounts.Count = yearCounts.Count.astype(int)
+    global yearCounts
     plt.figure(figsize=(10,9))
-    sns.set_palette(pal, len(yC))
-    LP = sns.lineplot(x='Year', y='Count', hue='Category', data=yearCounts, markers=range(len(yC)), palette=pal[:31])
-    #ax2 = yC.plot(xticks=range(len(yC)))
-    #sns.set_palette(sns.color_palette("Set1", len(yC)))
+    LP = sns.lineplot(x='Year', y='Count', hue='Category', data=yearCounts, markers=31, palette=rain2[:31])
+                      #palette=sns.diverging_palette(240,10,n=31,s=100,l=0,center='dark'))#rain[:31])#sns.color_palette('RdYlBu',31))
     LP.set_xticklabels(labels=yearCounts.Year,rotation=90)
     LP.set(xticks=yearCounts.Year)
     plt.ylabel("Number of Articles (per Year)")
-    #ax2.set_prop_cycle('color', colors)
     plt.title('Contributions by Category', color='black')
     plt.legend(loc='center left', bbox_to_anchor=(1.0, 0.5))
     plt.savefig('ByYear.png',bbox_inches='tight')
@@ -124,18 +122,34 @@ def plotLines():
     
 
 ##Plot Counts by Year##
-def plotAreas(pal):
-    yearCounts.Year = yearCounts.Year.astype(int)
-    yearCounts.Count = yearCounts.Count.astype(int)
+def plotAreas():
+    global yearCounts
     yC = yearCounts.pivot(index='Year', columns='Category', values = 'Count')
     plt.figure(figsize=(10,9))
-    sns.set_palette(pal, len(yC))
-    plt.stackplot(yC.index.values, np.array(yC).transpose(), labels=yC.columns, colors=pal)
+    sns.set_palette(sns.color_palette('Spectral',31))
+    plt.stackplot(yC.index.values, np.array(yC).transpose()[::-1], labels=yC.columns[::-1], colors=sns.color_palette('Spectral',31))
     plt.xticks(ticks=yC.index.values,rotation=90)
     plt.ylabel("Number of Articles (per Year)")
     plt.xlabel("Year")
     plt.title('Contributions by Category', color='black')
-    plt.legend(loc='center left', bbox_to_anchor=(1.0, 0.5))
-    #plt.legend(loc='upper left', bbox_to_anchor=(0.01, 1), ncol=3)
+    plt.legend(labelspacing=-2.5,frameon=False,loc='center left', bbox_to_anchor=(1.0, 0.5))
     plt.savefig('AreaByYear.png',bbox_inches='tight')
+    plt.show()
+
+
+##Plot Proportions by Year##
+def plotPropAreas():
+    yC = yearCounts.pivot(index='Year', columns='Category', values = 'Count')
+    Totals = yC.sum(axis=1).values ##compute total article count for each year
+    for i in range(len(yC)):  ##change all table value to proportions instead of counts
+        yC.iloc[i] = yC.iloc[i].divide(Totals[i])
+    fig = plt.figure(figsize=(10,9))
+    plt.stackplot(yC.index.values, np.array(yC).transpose()[::-1], labels=yC.columns[::-1], 
+                  colors=sns.color_palette('Spectral',31),edgecolor='gray')
+    plt.xticks(ticks=yC.index.values,rotation=90)
+    plt.ylabel("Proportion of Articles (per Year)")
+    plt.xlabel("Year")
+    plt.title('Annual Proportions by Category', color='black')
+    plt.legend(labelspacing=-2.5,frameon=False,loc='center left', bbox_to_anchor=(1.0, 0.5))
+    plt.savefig('PropByYear.png',bbox_inches='tight')
     plt.show()

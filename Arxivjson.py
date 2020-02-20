@@ -2,7 +2,36 @@ import sqlite3
 import operator
 import io
 
-##
+##add function to produce JSON files for connected components##
+def connectedComps(nodes,coauthors,names,ranks):
+    x=-3
+    fhand = io.open(names[nodes[x][0]]+'.js','w', encoding='utf-8')
+    tempMap = dict()
+    fhand.write('arXivJson = {"nodes":[\n')
+    weight = str(len(set(coauthors[nodes[-1][0]])))
+    fhand.write('{'+'"weight":'+weight+',"rank":'+str(ranks[nodes[x][0]])+',')
+    fhand.write(' "id":'+str(nodes[x][0])+', "url":"'+names[nodes[x][0]]+'"}')
+    tempMap[nodes[x][0]]=0
+    count = 1
+    for contributor in set(coauthors[nodes[x][0]]):
+        if contributor in names:  ##if the coauthor is one of the top authors
+            fhand.write(',\n')
+            weight = str(len(set(coauthors[contributor])))
+            fhand.write('{'+'"weight":'+weight+',"rank":'+str(ranks[contributor])+',')
+            fhand.write(' "id":'+str(contributor)+', "url":"'+names[contributor]+'"}')
+            tempMap[contributor]=count
+            count+=1
+    fhand.write('],\n')
+    fhand.write('"links":[')
+    for contributor in set(coauthors[nodes[x][0]]):
+        if contributor in names:
+            fhand.write('\n')
+            projects=coauthors[nodes[x][0]].count(contributor)
+            fhand.write('{"source":'+str(map[nodes[-1][0]])+',"target":'+str(tempMap[contributor])+',"value":'+str(projects)+'},')
+    fhand.write(']};')
+    fhand.close()
+    return tempMap
+            
 
 conn = sqlite3.connect('arXiv.sqlite')
 cur = conn.cursor()

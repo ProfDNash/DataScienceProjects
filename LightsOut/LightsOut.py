@@ -12,7 +12,6 @@ import numpy as np
  
 class PygView(object):
 
-  
     def __init__(self, width=640, height=400, fps=30):
         """Initialize pygame, window, background, font,...
            default arguments 
@@ -28,6 +27,16 @@ class PygView(object):
         self.fps = fps
         self.playtime = 0.0
         self.font = pygame.font.SysFont('mono', 24, bold=True)
+        
+    def ChooseInitBoard(self):
+        ##Not all 5x5 puzzles are solvable, so only pick a solvable one##
+        Check1 = np.array([0,1,1,1,0, 1,0,1,0,1, 1,1,0,1,1, 1,0,1,0,1, 0,1,1,1,0])
+        Check2 = np.array([1,0,1,0,1, 1,0,1,0,1, 0,0,0,0,0, 1,0,1,0,1, 1,0,1,0,1])
+        randMat = np.random.randint(2,size=25)
+        while np.dot(randMat,Check1)%2>0 or np.dot(randMat,Check2)%2>0:
+            randMat = np.random.randint(2,size=25)
+        randMat = randMat.reshape((5,5))
+        return randMat
 
     def paint(self,Mat = np.ones((5,5))):
         """painting on the surface"""
@@ -45,9 +54,9 @@ class PygView(object):
     def run(self):
         """The mainloop
         """
-        randMat = np.random.randint(2,size=25).reshape((5,5))
-        size = 5
-        self.paint(Mat = randMat) 
+        matrix = self.ChooseInitBoard()
+        size = matrix.shape[0]
+        self.paint(Mat = matrix) 
         running = True
         while running:
             for event in pygame.event.get():
@@ -65,8 +74,8 @@ class PygView(object):
                         for i in range(size):
                             for j in range(size):
                                 if (np.abs(row-i)<2 and col==j) or (row==i and np.abs(col-j)<2):
-                                    randMat[i,j] = (randMat[i,j]+1)%2 ##toggle light and adjacent lights
-                        self.paint(Mat = randMat)
+                                    matrix[i,j] = (matrix[i,j]+1)%2 ##toggle light and adjacent lights
+                        self.paint(Mat = matrix)
 
             milliseconds = self.clock.tick(self.fps)
             self.playtime += milliseconds / 1000.0

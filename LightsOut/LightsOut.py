@@ -22,7 +22,7 @@ KnownSols = {'10001': '11000',
  
 class PygView(object):
 
-    def __init__(self, width=700, height=400, fps=30):
+    def __init__(self, width=700, height=400, fps=60):
         """Initialize pygame, window, background, font,...
            default arguments 
         """
@@ -71,9 +71,11 @@ class PygView(object):
         shift = size + 2
         for row in range(size):
             for col in range(size):
-                mycell = Cell(col=col, row=row, color=(0,255*Mat[row,col],255),background=self.background)
+                mycell = Cell(col=col, row=row, color=(0,255*Mat[row,col],255),
+                              background=self.background)
                 mycell.blit(self.background)
-                solcell = Cell(col=col+shift, row=row, color=(255*sM[row,col],0,255), background=self.background)
+                solcell = Cell(col=col+shift, row=row, color=(255*sM[row,col],0,255),
+                               background=self.background)
                 solcell.blit(self.background)
         
 
@@ -104,47 +106,46 @@ class PygView(object):
                         M[i,j] = (M[i,j]+1)%2 ##toggle light and adjacent lights
                         self.paint(row=i,col=j,color=(0,255*M[i,j],255))
             sM[row,col] = sM[row,col]+1
-            self.paint(col=col+shift,row=row,color=(255*(sM[row,col]%2),0,255)) ##paint the cell clicked on in the solution
+            ##paint the cell clicked on in the solution
+            self.paint(col=col+shift,row=row,color=(255*(sM[row,col]%2),0,255)) 
         return M, sM
     
-    def stepOne(self, M = np.ones((5,5)), sM = np.zeros((5,5))):
-        size = len(M)
-        if 1 in M[:size-1,:]: ##if any lights in the first n-1 cols are lit
-            for i in range(size-1): 
-                for j in range(size):
-                    if M[i,j] == 1:  ##if a light is lit, use the next row down to clear it
-                        M, sM = self.click(row=i+1,col=j,M=M, sM=sM)
+    def lastRow(self, M=np.ones((5,5))):
         ##create a string of the arrangement in the last column
+        size = len(M)
         arr = ''
         for j in range(size):
             arr = arr + str(M[-1,j])    
-        return arr, M, sM
+        return arr
     
-    def stepTwo(self, M = np.ones((5,5)), sM = np.zeros((5,5)), arr='00000'):
-        size = len(M)
-        if '1' in arr:  ##if any lights are still on keep solving
-            if arr in KnownSols:
-                nxt = KnownSols[arr]
-                for j in range(size):
-                    if nxt[j] == '1':
-                        M, sM = self.click(row=0,col=j,M=M, sM=sM) ##click the required boxes in column 0
-            else:
-                pass ##add algorithm in unknown cases
-        return M, sM
+    def iterate(self, i, j, step2, size):
+        if j<size-1:
+            j += 1
+        elif step2 == True:
+            j = 0
+            step2 = False
+        else:
+            i += 1
+            j = 0
+            if i == size-1:
+                step2 = True
+        return i, j, step2
             
 
 ##Edit this to run one step of the solving algorithm each frame##
     def run(self):
-        """The mainloop
-        """
+        """The mainloop"""
         matrix = self.ChooseInitBoard()
         size = matrix.shape[0]
-        #self.paint(Mat = matrix)
         solMatrix = np.zeros((size,size))  ## keep track of the buttons pressed in working to solve
         self.paintInit(Mat=matrix, sM=solMatrix)
         running = True
         checkflag = False
         stop = False
+        solving = False
+        step2 = False
+        finalRow = ''
+        attempt = ''  ##attempt at a solution if solution is unknown
         while running:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
@@ -152,26 +153,54 @@ class PygView(object):
                 elif event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_ESCAPE:
                         running = False
-                elif event.type == pygame.MOUSEBUTTONUP:
+                ##don't allow clicking while it's solving##
+                elif solving == False and event.type == pygame.MOUSEBUTTONUP:
                     pos = pygame.mouse.get_pos()
                     checkflag = True  ##check for a win after clicking anything
                     if 97<=pos[0]<=177 and 290<=pos[1]<=325:  ##then we clicked on the 'solve' button
-                        left = '11111'
-                        while '1' in left: ##if any lights are still on, keep solving
-                            left, matrix, solMatrix = self.stepOne(M = matrix, sM=solMatrix)
-                            print(left)
-                            if '1' in left:
-                                matrix, solMatrix = self.stepTwo(M=matrix, sM=solMatrix, arr=left)
+                        solving = True
+                        #set initial position for the solving algorithm#
+                        i=0
+                        j=0
                     elif 5<=pos[0]%55 and 5<=pos[1]%55:  ##make sure the click isn't on a boundary 
                         row = pos[1]//55
                         col = pos[0]//55
                         #print(row,col)
                         matrix, solMatrix = self.click(row, col, matrix, solMatrix)
+                elif solving == True:
+                    checkFlag=True
+                    ##run through the next step in the solving process##
+                    if i == 0 and step2 == True:
+                        if attempt[j]=='1':
+                            matrix, solMatrix = self.click(row=i,col=j,M=matrix, sM=solMatrix)
+                    elif i<size-1:  ##then we're running the first part of the algorithm
+                        ##if a light is lit, use the next row down to clear it
+                        if matrix[i,j] == 1:  
+                            matrix, solMatrix = self.click(row=i+1,col=j,M=matrix, sM=solMatrix)
+                    elif i == size-1:
+                        ##when reaching the last row, get a string for the arrangement
+                        temp = self.lastRow(M = matrix)
+                        if '1' in temp:  ##if we haven't finished solving yet
+                            finalRow = temp
+                            print(finalRow)
+                            if finalRow in KnownSols:
+                                attempt = KnownSols[finalRow]
+                                step2 = True
+                                i=0
+                                j=-1
+                            else:
+                                pass ##add later when allowing non 5x5 boards
+                        else:  ##if we finished, add the information to the dictionary if it is missing
+                            solving = False
+                            if finalRow not in KnownSols:
+                                KnownSols[finalRow] = attempt
+                    i,j,step2 = self.iterate(i,j,step2,size)                       
+                            
                     
+            #if stop == False:
+            #    checkflag = self.checkWin(checkflag, Mat=matrix)
             if stop == False:
-                checkflag = self.checkWin(checkflag, Mat=matrix)
-            if stop == False:
-                if checkflag == True:
+                if self.checkWin(True, Mat = matrix): #checkflag == True:
                     print('You Win!!')
                     stop = True
                 else:
@@ -196,7 +225,8 @@ class PygView(object):
         
 class Cell(object):
     """This is meant to be a method to draw a single cell"""
-    def __init__(self, length = 50, col = 0, row = 0, color=(0,0,255), background = pygame.Surface((400,400))):
+    def __init__(self, length = 50, col = 0, row = 0, color=(0,0,255), 
+                 background = pygame.Surface((400,400))):
         self.length = length
         self.x = col*55
         self.y = row*55

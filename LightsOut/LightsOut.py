@@ -182,6 +182,15 @@ class PygView(object):
                     ##when reaching the last row, get a string for the arrangement
                     temp = self.lastRow(M = matrix)
                     if '1' in temp:  ##if we haven't finished solving yet
+                        if len(finalRow) == len(temp):
+                            diff = '' ##measure the difference between the previous final row and new
+                            for ch in range(len(finalRow)):
+                                diff = diff + str((int(temp[ch]) - int(finalRow[ch]))%2)
+                            if diff not in KnownSols:
+                                KnownSols[finalRow] = attempt
+                                ## save Known Sols ##
+                                with open('KS.p', 'wb') as fp:
+                                    pickle.dump(KnownSols, fp, protocol=pickle.HIGHEST_PROTOCOL)
                         finalRow = temp
                         print('Last row: ', finalRow)
                         if finalRow in KnownSols:

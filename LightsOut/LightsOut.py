@@ -133,6 +133,7 @@ class PygView(object):
         return M, sM
             
 
+##Edit this to run one step of the solving algorithm each frame##
     def run(self):
         """The mainloop
         """

@@ -9,20 +9,16 @@ import pygame
 from pygame.locals import *
 import numpy as np
 import time
+import pickle  ##for saving known solutions
 
 ##define global dictionary to keep track of known solutions##
-KnownSols = {'10001': '11000',
-        '01010': '10010',
-        '11100': '01000',
-        '00111': '00010',
-        '10110': '00001',
-        '01101': '10000',
-        '11011': '00100'}
+with open('KS.p', 'rb') as fp:
+    KnownSols = pickle.load(fp)
 
  
 class PygView(object):
 
-    def __init__(self, width=700, height=400, fps=60):
+    def __init__(self, width=1000, height=600, fps=60):
         """Initialize pygame, window, background, font,...
            default arguments 
         """
@@ -41,17 +37,21 @@ class PygView(object):
         pygame.draw.rect(self.background, (0,255,255), (97,290,80,35)) # rect: (x1, y1, width, height)
         button = self.font.render('Solve', True, (0,255,0), (0,0,128))
         buttonRect = button.get_rect()
-        buttonRect.center = (137,307)
+        buttonRect.center = (500,500)
         self.background.blit(button,buttonRect) 
         
-    def ChooseInitBoard(self):
-        ##Not all 5x5 puzzles are solvable, so only pick a solvable one##
-        Check1 = np.array([0,1,1,1,0, 1,0,1,0,1, 1,1,0,1,1, 1,0,1,0,1, 0,1,1,1,0])
-        Check2 = np.array([1,0,1,0,1, 1,0,1,0,1, 0,0,0,0,0, 1,0,1,0,1, 1,0,1,0,1])
-        randMat = np.random.randint(2,size=25)
-        while np.dot(randMat,Check1)%2>0 or np.dot(randMat,Check2)%2>0:
-            randMat = np.random.randint(2,size=25)
-        randMat = randMat.reshape((5,5))
+    def ChooseInitBoard(self,sz = 5):
+        ##Not all oddxodd puzzles are solvable, so only pick a solvable one##
+        if sz==5:  ##add more for other odd numbers later
+            ##build "quiet patterns" to check for solvability##
+            Check1 = np.array([0,1,1,1,0, 1,0,1,0,1, 1,1,0,1,1, 1,0,1,0,1, 0,1,1,1,0])
+            Check2 = np.array([1,0,1,0,1, 1,0,1,0,1, 0,0,0,0,0, 1,0,1,0,1, 1,0,1,0,1])
+        ##All evenxeven boards are solvable though!
+        randMat = np.random.randint(2,size=sz*sz)
+        if sz==5:
+            while np.dot(randMat,Check1)%2>0 or np.dot(randMat,Check2)%2>0:
+                randMat = np.random.randint(2,size=sz*sz)
+        randMat = randMat.reshape((sz,sz))
         return randMat
     
     def checkWin(self, flag, Mat = np.ones((5,5))):
@@ -135,7 +135,7 @@ class PygView(object):
 ##Edit this to run one step of the solving algorithm each frame##
     def run(self):
         """The mainloop"""
-        matrix = self.ChooseInitBoard()
+        matrix = self.ChooseInitBoard(sz=6)
         size = matrix.shape[0]
         solMatrix = np.zeros((size,size))  ## keep track of the buttons pressed in working to solve
         self.paintInit(Mat=matrix, sM=solMatrix)
@@ -157,7 +157,7 @@ class PygView(object):
                 elif solving == False and event.type == pygame.MOUSEBUTTONUP:
                     pos = pygame.mouse.get_pos()
                     checkflag = True  ##check for a win after clicking anything
-                    if 97<=pos[0]<=177 and 290<=pos[1]<=325:  ##then we clicked on the 'solve' button
+                    if 460<=pos[0]<=540 and 482<=pos[1]<=518:  ##then we clicked on the 'solve' button
                         solving = True
                         #set initial position for the solving algorithm#
                         i=0
@@ -167,38 +167,44 @@ class PygView(object):
                         col = pos[0]//55
                         #print(row,col)
                         matrix, solMatrix = self.click(row, col, matrix, solMatrix)
-                elif solving == True:
-                    checkFlag=True
-                    ##run through the next step in the solving process##
-                    if i == 0 and step2 == True:
-                        if attempt[j]=='1':
-                            matrix, solMatrix = self.click(row=i,col=j,M=matrix, sM=solMatrix)
-                    elif i<size-1:  ##then we're running the first part of the algorithm
-                        ##if a light is lit, use the next row down to clear it
-                        if matrix[i,j] == 1:  
-                            matrix, solMatrix = self.click(row=i+1,col=j,M=matrix, sM=solMatrix)
-                    elif i == size-1:
-                        ##when reaching the last row, get a string for the arrangement
-                        temp = self.lastRow(M = matrix)
-                        if '1' in temp:  ##if we haven't finished solving yet
-                            finalRow = temp
-                            print(finalRow)
-                            if finalRow in KnownSols:
-                                attempt = KnownSols[finalRow]
-                                step2 = True
-                                i=0
-                                j=-1
-                            else:
-                                pass ##add later when allowing non 5x5 boards
-                        else:  ##if we finished, add the information to the dictionary if it is missing
-                            solving = False
-                            if finalRow not in KnownSols:
-                                KnownSols[finalRow] = attempt
-                    i,j,step2 = self.iterate(i,j,step2,size)                       
-                            
+            
+            if solving == True:
+                checkFlag=True
+                ##run through the next step in the solving process##
+                if i == 0 and step2 == True:
+                    if attempt[j]=='1':
+                        matrix, solMatrix = self.click(row=i,col=j,M=matrix, sM=solMatrix)
+                elif i<size-1:  ##then we're running the first part of the algorithm
+                    ##if a light is lit, use the next row down to clear it
+                    if matrix[i,j] == 1:  
+                        matrix, solMatrix = self.click(row=i+1,col=j,M=matrix, sM=solMatrix)
+                elif i == size-1:
+                    ##when reaching the last row, get a string for the arrangement
+                    temp = self.lastRow(M = matrix)
+                    if '1' in temp:  ##if we haven't finished solving yet
+                        finalRow = temp
+                        print('Last row: ', finalRow)
+                        if finalRow in KnownSols:
+                            attempt = KnownSols[finalRow]
+                        else:  ##choose a random selection of buttons to press in the top row
+                            attempt = ''
+                            while '1' not in attempt and attempt not in KnownSols.values():
+                                attempt = ''
+                                for i in range(size):
+                                    attempt = attempt + str(np.random.randint(0,2))
+                        step2 = True
+                        i=0
+                        j=-1
+                        print('Attempt: ', attempt)
+                    else:  ##if we finished, add the information to the dictionary if it is missing
+                        solving = False
+                        if finalRow not in KnownSols:
+                            KnownSols[finalRow] = attempt
+                            ## save Known Sols ##
+                            with open('KS.p', 'wb') as fp:
+                                pickle.dump(KnownSols, fp, protocol=pickle.HIGHEST_PROTOCOL)
+                i,j,step2 = self.iterate(i,j,step2,size)                       
                     
-            #if stop == False:
-            #    checkflag = self.checkWin(checkflag, Mat=matrix)
             if stop == False:
                 if self.checkWin(True, Mat = matrix): #checkflag == True:
                     print('You Win!!')
@@ -206,9 +212,9 @@ class PygView(object):
                 else:
                     milliseconds = self.clock.tick(self.fps)
                     self.playtime += milliseconds / 1000.0
-            self.draw_text("Clicks: {:6.3}{}PLAYTIME: {:6.3} SECONDS".format(
+            self.draw_text("Clicks: {:6.4}{}PLAYTIME: {:6.3} SECONDS".format(
                     np.sum(solMatrix), " "*5, self.playtime))
-            self.draw_text("Min Clicks: {:6.3}".format(np.sum(solMatrix%2)), loc=(50,370))
+            self.draw_text("Min Clicks: {:6.3}".format(np.sum(solMatrix%2)), loc=(50,570))
 
             pygame.display.flip()
             self.screen.blit(self.background, (0, 0))
@@ -216,7 +222,7 @@ class PygView(object):
         pygame.quit()
 
 
-    def draw_text(self, text,loc=(50,350)):
+    def draw_text(self, text,loc=(50,550)):
         """Center text in window
         """
         fw, fh = self.font.size(text)

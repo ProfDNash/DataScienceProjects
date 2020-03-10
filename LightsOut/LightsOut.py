@@ -199,6 +199,7 @@ class PygView(object):
         stop = False  ##this flag is True when the clock updates should stop
         solving = False  ##this flag is True when the solving process is running
         step2 = False  ##this flag is True to signify step 2 of the solving process
+        errorMes = False  ##this flag is True to signify when the error message is visible
         finalRow = ''
         attempt = ''  ##attempt at a solution if solution is unknown
         while running:
@@ -212,6 +213,7 @@ class PygView(object):
                     if event.key == pygame.K_ESCAPE:
                         running = False
                 elif event.type == pygame.MOUSEBUTTONUP:
+                    errorMes = False
                     pos = pygame.mouse.get_pos()
                     #print(pos)
                     if 5<=pos[0]%55 and 5<=pos[1]%55:  ##make sure the click isn't on a boundary 
@@ -226,12 +228,15 @@ class PygView(object):
                         matrix = self.ChooseInitBoard(sz=size)
                         self.paintInit(Mat = matrix, sM = solMatrix)
                     elif 390<=pos[0]<=460:  ##it's the 'begin' button
-                        setup = False
-                        print('Out of Setup Mode')
-                        initMat = matrix.astype(int)
-                        matrix = matrix.astype(int)
-                        self.clock = pygame.time.Clock()
-                        stop = False  ##begin the clock
+                        if self.checkSolvable(Mat=matrix.reshape(matrix.size,)):
+                            setup = False
+                            print('Out of Setup Mode')
+                            initMat = matrix.astype(int)
+                            matrix = matrix.astype(int)
+                            self.clock = pygame.time.Clock()
+                            stop = False  ##begin the clock
+                        else: ##do not allow the user to set an unsolvable pattern
+                            errorMes = True
                     else:  #check if we clicked on a number
                         for num in range(4,9):
                             if -170+50*num<=pos[0]<=-130+50*num:
@@ -311,6 +316,9 @@ class PygView(object):
                     np.sum(solMatrix), " "*5, self.playtime))
             self.draw_text("Min Clicks: {:6.3}".format(np.sum(solMatrix%2)), loc=(50,570))
             self.draw_text("Minimal Solution", loc=((3*size/2)*55,(size+0.5)*55))
+            
+            if errorMes == True:
+                self.draw_text("Error: Current Pattern is unsolvable", loc = (50,520), color = (255,0,0))
 
             pygame.display.flip()
             self.screen.blit(self.background, (0, 0))
@@ -318,11 +326,11 @@ class PygView(object):
         pygame.quit()
 
 
-    def draw_text(self, text,loc=(50,550)):
+    def draw_text(self, text,loc=(50,550), color=(0,0,0)):
         """Center text in window
         """
         fw, fh = self.font.size(text)
-        surface = self.font.render(text, True, (0, 0, 0))
+        surface = self.font.render(text, True, color)
         self.screen.blit(surface, loc)
         
 class Cell(object):

@@ -45,7 +45,7 @@ for i in range(len(textList)):
         recordList.append(record)
 
 ##setup DataFrame to hold the information
-DF = pd.DataFrame(columns=['Name', 'District', 'Date', 'Offense', 'Sentence', 'Terms of Grant'], data=recordList)
+DF = pd.DataFrame(columns=['Name', 'Offense', 'District', 'Date', 'Sentence', 'Terms of Grant'], data=recordList)
 
 Drug = 0
 for off in DF.Offense:
